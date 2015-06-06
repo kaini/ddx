@@ -61,7 +61,7 @@ term(BO) :- binop_type_arg_arg(BO, _, A, B), term(A), term(B).
 term(FN) :- fn_type_arg(FN, _, A), term(A).
 
 term_latex_root(T) -->
-	"\\int ", term_latex(T, false, true), " \\:\\textup{d}x".
+	"\\int ", term_latex(T, false, true), " \\:\\operatorname{d}\\!x".
 
 % arguments: (term, multiplication brace, addition brace)
 term_latex(V, _, _) -->
@@ -107,15 +107,15 @@ term_latex(A^(1/2), _, _) -->
 	term_latex(A, false, false),
 	"}".
 term_latex(sin(T), _, _) -->
-	"\\textup{sin}\\left(", term_latex(T, false, false), "\\right)".
+	"\\sin\\left(", term_latex(T, false, false), "\\right)".
 term_latex(cos(T), _, _) -->
-	"\\textup{cos}\\left(", term_latex(T, false, false), "\\right)".
+	"\\cos\\left(", term_latex(T, false, false), "\\right)".
 term_latex(tan(T), _, _) -->
-	"\\textup{tan}\\left(", term_latex(T, false, false), "\\right)".
+	"\\tan\\left(", term_latex(T, false, false), "\\right)".
 term_latex(cot(T), _, _) -->
-	"\\textup{cot}\\left(", term_latex(T, false, false), "\\right)".
+	"\\cot\\left(", term_latex(T, false, false), "\\right)".
 term_latex(ln(T), _, _) -->
-	"\\textup{ln}\\left(", term_latex(T, false, false), "\\right)".
+	"\\ln\\left(", term_latex(T, false, false), "\\right)".
 
 obrace(false) -->
 	"".
@@ -551,7 +551,7 @@ f_maxsimple(F, S) :-
 :- f_maxsimple(n(5)^x+n(3)+x^n(5), x^n(5)+n(5)^x+n(3)).
 :- f_maxsimple(n(3) + (n(2) - x^n(1) + x^n(2))^n(3) + n(2)*x^n(4),
 	           (x^n(2) - x + n(2))^n(3) + n(2)*x^n(4) + n(3)).
-:- f_maxsimple(x + x*x*x + x*x + x*x*x*x, x^n(4) + x^n(3) + x^n(2) + x).
+:- f_maxsimple(x + x*x*x + x*x + x*x*x*x, x* (x* (x* (x+n(1))+n(1))+n(1))).
 :- f_maxsimple(x+x+x+x+x+x+x, n(7)*x).
 
 :- f_maxsimple(x^x*n(4), n(4)*x^x).
