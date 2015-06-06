@@ -2,7 +2,8 @@
 main(Formula, Tex) :-
 	f_ddx(Formula, Dx),
 	f_maxsimple(Dx, Simple),
-	phrase(term_latex_root(Simple), Tex).
+	f_postsimple(Simple, PSimple),
+	phrase(term_latex_root(PSimple), Tex).
 
 main_print(Formula) :-
 	main(Formula, Tex),
@@ -107,25 +108,25 @@ term_latex(A^(1/2), _, _) -->
 	term_latex(A, false, false),
 	"}".
 term_latex(sin(T), _, _) -->
-	"\\sin\\left(", term_latex(T, false, false), "\\right)".
+	"\\sin\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
 term_latex(cos(T), _, _) -->
-	"\\cos\\left(", term_latex(T, false, false), "\\right)".
+	"\\cos\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
 term_latex(tan(T), _, _) -->
-	"\\tan\\left(", term_latex(T, false, false), "\\right)".
+	"\\tan\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
 term_latex(cot(T), _, _) -->
-	"\\cot\\left(", term_latex(T, false, false), "\\right)".
+	"\\cot\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
 term_latex(ln(T), _, _) -->
-	"\\ln\\left(", term_latex(T, false, false), "\\right)".
+	"\\ln\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
 
 obrace(false) -->
 	"".
 obrace(true) -->
-	"\\left(".
+	"\\mathopen{}\\left(".
 
 cbrace(false) -->
 	"".
 cbrace(true) -->
-	"\\right)".
+	"\\right)\\mathclose{}".
 
 constant_latex(e) -->
 	"e".
@@ -338,9 +339,11 @@ matches_replaces_mul_result(Ms, Rs, T, U) :-
 
 % Collect all terms in a (left associative) addition chain
 % 1+2-3 results in [t(+,1), t(+,2), t(-,3)] - t "means" term
+addition_terms(n(-1)*A, [t(-, A)]).
 addition_terms(A, [t(+, A)]) :-
 	not(A = _+_),
-	not(A = _-_).
+	not(A = _-_),
+	not(A = n(-1)*_).
 addition_terms(A-B, [t(-, B)|Us]) :-
 	addition_terms(A, Us).
 addition_terms(A+B, [t(+, B)|Us]) :-
@@ -379,48 +382,53 @@ f_simple(A*(B/C), A*B/C).
 f_simple(A/(B*C), A/B/C).
 f_simple(A/(B/C), A/B*C).
 % Addition & Subdraction
-f_simple(T, U) :-
+f_simple(T, U) :-  % remove zeros
 	addition_terms(T, Ts),
 	member(t(_,n(0)), Ts),
 	filter_list_list(t(_,n(0)), Ts, Us),
 	terms_addition(Us, U).
-f_simple(T, U) :-
+f_simple(T, U) :-  % merge constants
 	matches_replaces_addition_result([t(+,n(A)), t(+,n(B))], [t(+,n(N)), t(+,n(0))], T, U),
 	N is A + B.
-f_simple(T, U) :-
+f_simple(T, U) :-  % merge constants
 	matches_replaces_addition_result([t(+,n(A)), t(-,n(B))], [t(+,n(N)), t(-,n(0))], T, U),
 	N is A - B.
-f_simple(T, U) :-
+f_simple(T, U) :-  % A+A = 2*A
 	dif(A, n(0)),
 	matches_replaces_addition_result([t(Op,A), t(Op,A)], [t(Op,n(2)*A), t(Op,n(0))], T, U).
-f_simple(T, U) :-
+f_simple(T, U) :-  % N*A+A = (N+1)*A
 	dif(A, n(0)),
 	matches_replaces_addition_result([t(Op,n(N)*A), t(Op,A)], [t(Op,n(M)*A), t(Op,n(0))], T, U),
 	M is N + 1.
-f_simple(T, U) :-
+f_simple(T, U) :-  % TODO merge with ^
 	dif(A, n(0)),
 	matches_replaces_addition_result([t(Op,A*n(N)), t(Op,A)], [t(Op,n(M)*A), t(Op,n(0))], T, U),
 	M is N + 1.
 % Multiplication & Division
-f_simple(T, n(0)) :-
+f_simple(T, n(0)) :-  % remove zeros
 	mul_terms(T, Ts),
 	member(t(*, n(0)), Ts).
-f_simple(T, U) :-
+f_simple(T, U) :-  % remove ones
 	mul_terms(T, Ts),
 	member(t(_,n(1)), Ts),
 	filter_list_list(t(_,n(1)), Ts, Us),
 	terms_mul(Us, U).
-f_simple(T, U) :-
-	matches_replaces_mul_result([t(*,n(A)), t(*,n(B))], [t(*,n(N)), t(*,n(1))], T, U),
+f_simple(T, U) :-  % merge constants
+	matches_replaces_mul_result([t(Op,n(A)), t(Op,n(B))], [t(Op,n(N)), t(Op,n(1))], T, U),
 	N is A * B.
-%f_simple(T, U) :-
-%	matches_replaces_mul_result([t(*,n(A)), t(/,n(B))], [t(*,n(N)), t(/,n(1))], T, U),
-%	N is A rdiv B.
-f_simple(T, U) :-
+f_simple(T, U) :-  % merge constants
+	matches_replaces_mul_result([t(*,n(A)), t(/,n(B))], [t(*,n(N)), t(*,n(1))], T, U),
+	N is A / B,
+	integer(N).
+f_simple(T, U) :-  % merge constants (gcd)
+	matches_replaces_mul_result([t(*,n(A)), t(/,n(B))], [t(*,n(C)), t(/,n(D))], T, U),
+	N is A rdiv B,
+	C rdiv D = N.
+f_simple(T, U) :-  % A*A = A^2
 	dif(A, n(1)),
 	dif(A, n(0)),
 	matches_replaces_mul_result([t(*,A), t(*,A)], [t(*,A^n(2)), t(*,n(1))], T, U).
-f_simple(T, U) :-
+f_simple(T, U) :-  % A/A = 1
 	dif(A, n(1)),
 	dif(A, n(0)),
 	matches_replaces_mul_result([t(*,A), t(/,A)], [t(*,n(1)), t(/,n(1))], T, U).
@@ -429,26 +437,25 @@ f_simple(_^n(0), n(1)).
 f_simple(A^n(1), A).
 f_simple(n(1)^_, n(1)).
 f_simple(n(0)^_, n(0)).
-f_simple(n(A)^n(B), N) :-
+f_simple((A^B)^C, A^(B*C)).
+f_simple(n(A)^n(B), N) :-  % merge constants
 	N is A ^ B.
-f_simple(A^n(N), n(1)/(A^n(M))) :-
+f_simple(A^n(N), n(1)/(A^n(M))) :-  % A^-1 = 1/A
 	N < 0,
 	M is (-1) * N.
-f_simple((A^B)^C, A^(B*C)).
-f_simple(T, U) :-
+f_simple(T, U) :-  % A^N * A = A^(N+1)
 	matches_replaces_mul_result([t(*,A^N), t(*,A)], [t(*,A^(N+n(1))), t(*,n(1))], T, U).
-f_simple(T, U) :-
+f_simple(T, U) :-  % A^B * A^C = A^(B+C)
 	matches_replaces_mul_result([t(*,A^B), t(*,A^C)], [t(*,A^(B+C)), t(*,n(1))], T, U).
-% Kürzi kürzi
-f_simple(T, U) :-
+f_simple(T, U) :-  % A^N / A^M = A^(N-M)
 	dif(A, n(0)),
 	dif(A, n(1)),
 	matches_replaces_mul_result([t(*,A^N), t(/,A^M)], [t(*,A^(N-M)), t(/,n(1))], T, U).
-f_simple(T, U) :-
+f_simple(T, U) :-  % A / A^N = 1 / A^(N-1)
 	dif(A, n(0)),
 	dif(A, n(1)),
 	matches_replaces_mul_result([t(*,A), t(/,A^N)], [t(*,n(1)), t(/, A^(N-n(1)))], T, U).
-f_simple(T, U) :-
+f_simple(T, U) :-  % A^N / A = A^(N-1)
 	dif(A, n(0)),
 	dif(A, n(1)),
 	matches_replaces_mul_result([t(*,A^N), t(/,A)], [t(*,A^(N-n(1))), t(/,n(1))], T, U).
@@ -463,6 +470,12 @@ f_simple(T, U) :-
 	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], Z, NewZ),
 	N < 0,
 	M is N * (-1).
+f_simple(T, U) :-
+	Ts = [_,_|_],
+	addition_terms(T, Ts),
+	maplist(\t(-,A)^t(+,A)^true, Ts, Us),
+	terms_addition(Us, U1),
+	U = n(-1) * U1.
 % ln
 f_simple(ln(A^B), B*ln(A)).
 f_simple(ln(e), n(1)).
@@ -484,16 +497,16 @@ f_simple(tan(pi), n(0)).
 % cot
 f_simple(cot(pi/n(2)), n(0)).
 f_simple(cot(n(1)/n(2)*pi), n(0)).
-% Raushebi raushebi
+% Factor common terms (distributive law)
 f_simple(T, U) :-
 	dif(A, n(0)),
 	dif(A, n(1)),
 	addition_terms(T, Ts),
 	length(Ts, TsLen),
 	TsLen > 1,
-	maplist({A}+\t(Op,LT)^t(Op,LU)^matches_replaces_mul_result([t(*,A)], [t(*,n(1))], LT, LU), Ts, Ds),
+	maplist({DOp,A}+\t(Op,LT)^t(Op,LU)^matches_replaces_mul_result([t(DOp,A)], [t(DOp,n(1))], LT, LU), Ts, Ds),
 	terms_addition(Ds, D),
-	U = A*D.
+	binop_type_arg_arg(U, DOp, D, A).
 % Sort the terms
 f_simple(T, U) :-
 	Ts = [_,_|_],
@@ -547,6 +560,7 @@ f_maxsimple(F, S) :-
 	           (x^n(2) - x + n(2))^n(3) + n(2)*x^n(4) + n(3)).
 :- f_maxsimple(x + x*x*x + x*x + x*x*x*x, x* (x* (x* (x+n(1))+n(1))+n(1))).
 :- f_maxsimple(x+x+x+x+x+x+x, n(7)*x).
+:- f_maxsimple(cos(x)-ln(x), n(-1)*ln(x)+cos(x)).
 
 :- f_maxsimple(x^x*n(4), n(4)*x^x).
 :- f_maxsimple((n(1)+n(2)+n(3))*n(5), n(30)).
@@ -555,8 +569,9 @@ f_maxsimple(F, S) :-
 
 :- f_maxsimple(n(1) + x^n(3) + x^n(5)*n(4), n(4)*x^n(5) + x^n(3) + n(1)).
 :- f_maxsimple(n(4)*x^n(4)/n(3) + (x^x)/n(4), x^x/n(4) + n(4)*x^n(4)/n(3)).
-:- f_maxsimple(n(4)*x^n(4)/n(-3) + (x^x)/n(-4), n(-1)*x^x/n(4) - n(4)*x^n(4)/n(3)).
+:- f_maxsimple(n(4)*x^n(4)/n(-3) + (x^x)/n(-4), n(-1) * (x^x/n(4) + n(4)*x^n(4)/n(3))).
 :- f_maxsimple(n(2)/n(4), n(1)/n(2)).
+:- f_maxsimple(n(4)/n(2), n(2)).
 
 :- f_maxsimple(x^n(-1), n(1)/x).
 :- f_maxsimple((x*x) + n(4) + (x*x), n(2)*x^n(2) + n(4)).
@@ -589,8 +604,42 @@ f_maxsimple(F, S) :-
 :- f_maxsimple(n(1)/cos(x)-n(1)/cos(x), n(0)).
 :- f_maxsimple(n(1)/cos(x)/sin(x) - n(1)/cos(x), (n(1)/sin(x) - n(1))/cos(x)).
 
+:- f_maxsimple(n(-1)*ln(x)-cos(x)-cot(x), n(-1)*(ln(x)+cos(x)+cot(x))).
+
 :- f_ddx(ln(ln(n(1)/x)), D), f_maxsimple(D, n(-1)/x/ln(n(1)/x)).
 :- f_ddx(sin(cos(n(1)/x)), D), f_maxsimple(D, sin(n(1)/x)*cos(cos(n(1)/x))/x^n(2)).
 :- f_ddx(cos(x)/cos(x), D), f_maxsimple(D, n(0)).
 :- f_ddx(x*e^(pi*x), D), f_maxsimple(D, e^ (pi*x)* (pi*x+n(1))).
 :- f_ddx(sin(x^n(2))^n(2), D), f_maxsimple(D, n(4)*x*sin(x^n(2))*cos(x^n(2))).
+:- f_ddx(ln(ln(n(1)/x)/x)/x, D), f_maxsimple(D, n(-1)* (ln(ln(n(1)/x)/x)+ (ln(n(1)/x)+n(1))/ln(n(1)/x))/x^n(2)).
+
+% Does cleanup work that interferes with the simplification process
+% Chains of / will be merged to mulitplications: a*b/c/d/e = a*b/(c*d*e)
+f_postsimple(T, U) :-
+	Divs = [_|_],
+	Muls = [_|_],
+	mul_terms(T, Ts),
+	append(Divs, Muls, Ts),
+	maplist(\t(/,A)^t(*,B)^f_postsimple(A, B), Divs, DivsAsMuls),
+	maplist(\t(*,A)^t(*,B)^f_postsimple(A, B), Muls, MulsOpt),
+	!,
+	terms_mul(MulsOpt, U1),
+	terms_mul(DivsAsMuls, U2),
+	U = U1 / U2.
+% Recursion
+f_postsimple(T, U) :-
+	binop_type_arg_arg(T, Op, A, B),
+	f_postsimple(A, AS),
+	f_postsimple(B, BS),
+	binop_type_arg_arg(U, Op, AS, BS).
+f_postsimple(T, U) :-
+	fn_type_arg(T, Fn, A),
+	f_postsimple(A, AS),
+	fn_type_arg(U, Fn, AS).
+f_postsimple(C, C) :-
+	constant(C).
+f_postsimple(V, V) :-
+	variable(V).
+
+:- f_postsimple(n(1)*n(2)*n(3)/n(4)/n(5)/n(6), n(1)*n(2)*n(3)/(n(4)*n(5)*n(6))).
+:- f_postsimple(n(1)/n(2)/n(3) + n(4)/n(5), n(1)/(n(2)*n(3)) + n(4)/n(5)).
