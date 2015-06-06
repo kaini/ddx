@@ -61,88 +61,99 @@ term(C) :- constant(C).
 term(BO) :- binop_type_arg_arg(BO, _, A, B), term(A), term(B).
 term(FN) :- fn_type_arg(FN, _, A), term(A).
 
-term_latex_root(T) -->
-	"\\int ", term_latex(T, false, true), " \\:\\operatorname{d}\\!x".
+or(true, true, true).
+or(true, false, true).
+or(false, true, true).
+or(false, false, false).
 
-% arguments: (term, multiplication brace, addition brace)
-term_latex(V, _, _) -->
+term_latex_root(T) -->
+	"\\int", term_latex(T, false, true, false), "\\operatorname{d}\\!x".
+
+% arguments: (term, multiplication brace, addition brace, after brace)
+term_latex(V, _, _, _) -->
 	{ variable(V) },
 	variable_latex(V).
-term_latex(C, _, _) -->
+term_latex(C, _, _, AfterBr) -->
 	{ constant(C) },
-	constant_latex(C).
-term_latex(A+B, _, AddBr) -->
+	constant_latex(C, AfterBr).
+term_latex(A+B, _, AddBr, AfterBr) -->
 	obrace(AddBr),
-	term_latex(A, false, false),
+	{ or(AddBr, AfterBr, NeedBr) },
+	term_latex(A, false, false, NeedBr),
 	" + ",
-	term_latex(B, false, false),
+	term_latex(B, false, false, false),
 	cbrace(AddBr).
-term_latex(A-B, _, AddBr) -->
+term_latex(A-B, _, AddBr, AfterBr) -->
 	obrace(AddBr),
-	term_latex(A, false, false),
+	{ or(AddBr, AfterBr, NeedBr) },
+	term_latex(A, false, false, NeedBr),
 	" - ",
-	term_latex(B, false, true),
+	term_latex(B, false, true, false),
 	cbrace(AddBr).
-term_latex(A*B, MulBr, _) -->
+term_latex(A*B, MulBr, _, AfterBr) -->
 	obrace(MulBr),
-	term_latex(A, false, true),
+	{ or(MulBr, AfterBr, NeedBr) },
+	term_latex(A, false, true, NeedBr),
 	" ",
-	term_latex(B, false, true),
+	term_latex(B, false, true, false),
 	cbrace(MulBr).
-term_latex(A/B, _, _) -->
+term_latex(A/B, _, _, _) -->
 	"\\frac{",
-	term_latex(A, false, false),
+	term_latex(A, false, false, true),
 	"}{",
-	term_latex(B, false, false),
+	term_latex(B, false, false, true),
 	"}".
-term_latex(A^B, MulBr, _) -->
+term_latex(A^B, MulBr, _, _) -->
 	{ dif(B, 1/2) },
 	obrace(MulBr),
-	term_latex(A, true, true),
+	term_latex(A, true, true, false),
 	"^{",
-	term_latex(B, false, false),
+	term_latex(B, false, false, true),
 	"}",
 	cbrace(MulBr).
-term_latex(A^(1/2), _, _) -->
+term_latex(A^(1/2), _, _, _) -->
 	"\\sqrt{",
-	term_latex(A, false, false),
+	term_latex(A, false, false, true),
 	"}".
-term_latex(sin(T), _, _) -->
-	"\\sin\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
-term_latex(cos(T), _, _) -->
-	"\\cos\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
-term_latex(tan(T), _, _) -->
-	"\\tan\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
-term_latex(cot(T), _, _) -->
-	"\\cot\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
-term_latex(ln(T), _, _) -->
-	"\\ln\\mathopen{}\\left(", term_latex(T, false, false), "\\right)\\mathclose{}".
+term_latex(sin(T), _, _, _) -->
+	"\\sin(", term_latex(T, false, false, true), ")".
+term_latex(cos(T), _, _, _) -->
+	"\\cos(", term_latex(T, false, false, true), ")".
+term_latex(tan(T), _, _, _) -->
+	"\\tan(", term_latex(T, false, false, true), ")".
+term_latex(cot(T), _, _, _) -->
+	"\\cot(", term_latex(T, false, false, true), ")".
+term_latex(ln(T), _, _, _) -->
+	"\\ln(", term_latex(T, false, false, true), ")".
 
 obrace(false) -->
 	"".
 obrace(true) -->
-	"\\mathopen{}\\left(".
+	"\\left[".
 
 cbrace(false) -->
 	"".
 cbrace(true) -->
-	"\\right)\\mathclose{}".
+	"\\right]".
 
-constant_latex(e) -->
+constant_latex(e, _) -->
 	"e".
-constant_latex(pi) -->
+constant_latex(pi, _) -->
 	"\\pi".
-constant_latex(n(A rdiv B)) -->
-	term_latex(A/B, false, false).
-constant_latex(n(N)) -->
+constant_latex(n(N), _) -->
 	{ integer(N) },
 	{ N >= 0 },
 	{ format(string(Tex), '~d', [N]) },
 	Tex.
-constant_latex(n(N)) -->
+constant_latex(n(N), false) -->
 	{ integer(N) },
 	{ N < 0 },
 	{ format(string(Tex), '(~d)', [N]) },
+	Tex.
+constant_latex(n(N), true) -->
+	{ integer(N) },
+	{ N < 0 },
+	{ format(string(Tex), '~d', [N]) },
 	Tex.
 
 variable_latex(x) -->
@@ -372,6 +383,9 @@ matches_replaces_addition_result(Ms, Rs, T, U) :-
 % might invoke a endless loop especially if the + or * associativity is not fixed
 % yet. :(
 
+t_optpow(A, A, n(1)).
+t_optpow(A^B, A, B).
+
 % Fix associativity
 f_simple(A+(B+C), A+B+C).
 f_simple(A+(B-C), A+B-C).
@@ -494,9 +508,23 @@ f_simple(cos(n(3)/n(2)*pi), n(0)).
 % tan
 f_simple(tan(n(0)), n(0)).
 f_simple(tan(pi), n(0)).
+f_simple(T, U) :-
+	t_optpow(Sin, sin(A), P),
+	t_optpow(Cos, cos(A), P),
+	matches_replaces_mul_result([t(*, Sin), t(/, Cos)], [t(*,tan(A)^P), t(/, n(1))], T, U).
+f_simple(T, U) :-
+	t_optpow(Tan, tan(A), P),
+	matches_replaces_mul_result([t(/, Tan)], [t(*,cot(A)^P)], T, U).
 % cot
 f_simple(cot(pi/n(2)), n(0)).
 f_simple(cot(n(1)/n(2)*pi), n(0)).
+f_simple(T, U) :-
+	t_optpow(Sin, sin(A), P),
+	t_optpow(Cos, cos(A), P),
+	matches_replaces_mul_result([t(*, Cos), t(/, Sin)], [t(*,cot(A)^P), t(/, n(1))], T, U).
+f_simple(T, U) :-
+	t_optpow(Cot, cot(A), P),
+	matches_replaces_mul_result([t(/, Cot)], [t(*,tan(A)^P)], T, U).
 % Factor common terms (distributive law)
 f_simple(T, U) :-
 	dif(A, n(0)),
@@ -606,6 +634,11 @@ f_maxsimple(F, S) :-
 
 :- f_maxsimple(n(-1)*ln(x)-cos(x)-cot(x), n(-1)*(ln(x)+cos(x)+cot(x))).
 
+:- f_maxsimple(n(5)/tan(x^n(4))^n(2), n(5)*cot(x^n(4))^n(2)).
+:- f_maxsimple(n(5)/cot(x^n(4))^n(2), n(5)*tan(x^n(4))^n(2)).
+
+:- f_ddx(tan(x), D), f_maxsimple(D, tan(x)^n(2)+n(1)).
+:- f_ddx(cot(x), D), f_maxsimple(D, n(-1)*(cot(x)^n(2)+n(1))).
 :- f_ddx(ln(ln(n(1)/x)), D), f_maxsimple(D, n(-1)/x/ln(n(1)/x)).
 :- f_ddx(sin(cos(n(1)/x)), D), f_maxsimple(D, sin(n(1)/x)*cos(cos(n(1)/x))/x^n(2)).
 :- f_ddx(cos(x)/cos(x), D), f_maxsimple(D, n(0)).
