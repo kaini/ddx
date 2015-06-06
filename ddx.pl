@@ -271,8 +271,8 @@ plus_termorder(pi, n(_)).
 plus_termorder(n(N), n(M)) :-
 	N > M.
 
-rel_plus_termorder('>', A, B) :- plus_termorder(A, B), !.
-rel_plus_termorder('<', _, _).
+rel_plus_termorder(>, t(_, A), t(_, B)) :- plus_termorder(A, B), !.
+rel_plus_termorder(<, _, _) :- !.
 
 % Multiplicative order
 mulorder([C, V, MDP, ln(_), sin(_), cos(_), tan(_), cot(_), PM]) :-
@@ -305,24 +305,25 @@ mul_termorder(n(N), n(M)) :-
 	N < M.
 mul_termorder(e, pi).
 
-rel_mul_termorder('>', A, B) :- mul_termorder(A, B), !.
-rel_mul_termorder('<', _, _).
+rel_mul_termorder(>, t(*, _), t(/, _)) :- !.
+rel_mul_termorder(>, t(Op, A), t(Op, B)) :- mul_termorder(A, B), !.
+rel_mul_termorder(<, _, _) :- !.
 
 % Collect all terms in a (left assoc.) multiplication chain
-mul_terms(A, [A]) :-
+% 1*2/3 results in [t(*,1), t(*,2), t(/,3)] - t "means" term
+mul_terms(A, [t(*, A)]) :-
 	not(A = _*_),
 	not(A = _/_).
-mul_terms(n(1)/B, [n(1)/B]).
-mul_terms(A/B, [n(1)/B|Us]) :-
-	dif(A, n(1)),
+mul_terms(A/B, [t(/, B)|Us]) :-
 	mul_terms(A, Us).
-mul_terms(A*B, [B|Us]) :-
+mul_terms(A*B, [t(*, B)|Us]) :-
 	mul_terms(A, Us).
 
-terms_mul_([T], T).
-terms_mul_([n(1)/T|Ts], R/T) :-
+terms_mul_([t(/, T)], n(1)/T).
+terms_mul_([t(*, T)], T).
+terms_mul_([t(/, T)|Ts], R/T) :-
 	terms_mul_(Ts, R).
-terms_mul_([T|Ts], R*T) :-
+terms_mul_([t(*, T)|Ts], R*T) :-
 	terms_mul_(Ts, R).
 terms_mul([], n(1)).
 terms_mul(Xs, Mul) :-
@@ -333,24 +334,25 @@ matches_replaces_mul_result(Ms, Rs, T, U) :-
 	matches_replaces_list_list(Ms, Rs, Ts, Us),
 	terms_mul(Us, U).
 
-:- matches_replaces_mul_result([A,A], [A^2,1], 1*2*1, 1^2*2*1).
+:- matches_replaces_mul_result([t(*,A), t(*,A)], [t(*,A^2), t(*,1)], 1*2*1, 1^2*2*1).
 
 % Collect all terms in a (left associative) addition chain
-addition_terms(A, [t(plus, A)]) :-
+% 1+2-3 results in [t(+,1), t(+,2), t(-,3)] - t "means" term
+addition_terms(A, [t(+, A)]) :-
 	not(A = _+_),
 	not(A = _-_).
-addition_terms(A-B, [t(minus, B)|Us]) :-
+addition_terms(A-B, [t(-, B)|Us]) :-
 	addition_terms(A, Us).
-addition_terms(A+B, [t(plus, B)|Us]) :-
+addition_terms(A+B, [t(+, B)|Us]) :-
 	addition_terms(A, Us).
 
-terms_addition_([t(plus, T)], T).
-terms_addition_([t(minus, n(-1)*T)], n(-1)*T).
-terms_addition_([t(minus, T)], n(-1)*T) :-
+terms_addition_([t(+, T)], T).
+terms_addition_([t(-, n(-1)*T)], n(-1)*T).
+terms_addition_([t(-, T)], n(-1)*T) :-
 	not(T = n(-1)*_).
-terms_addition_([t(minus, T)|Ts], R-T) :-
+terms_addition_([t(-, T)|Ts], R-T) :-
 	terms_addition_(Ts, R).
-terms_addition_([t(plus, T)|Ts], R+T) :-
+terms_addition_([t(+, T)|Ts], R+T) :-
 	terms_addition_(Ts, R).
 terms_addition([], n(0)).
 terms_addition(Xs, Add) :-
@@ -361,14 +363,21 @@ matches_replaces_addition_result(Ms, Rs, T, U) :-
 	matches_replaces_list_list(Ms, Rs, Ts, Us),
 	terms_addition(Us, U).
 
-:- matches_replaces_addition_result([t(plus,A), t(plus,A)], [t(plus,2*A),t(plus,0)], 1+2+1, 2*1+2+0).
+:- matches_replaces_addition_result([t(+,A), t(+,A)], [t(+,2*A),t(+,0)], 1+2+1, 2*1+2+0).
 
 % Simplification rules, unfortunately the order is relevant, because later rules
 % might invoke a endless loop especially if the + or * associativity is not fixed
 % yet. :(
+
 % Fix associativity
 f_simple(A+(B+C), A+B+C).
+f_simple(A+(B-C), A+B-C).
+f_simple(A-(B+C), A-B-C).
+f_simple(A-(B-C), A-B+C).
 f_simple(A*(B*C), A*B*C).
+f_simple(A*(B/C), A*B/C).
+f_simple(A/(B*C), A/B/C).
+f_simple(A/(B/C), A/B*C).
 % Addition & Subdraction
 f_simple(T, U) :-
 	addition_terms(T, Ts),
@@ -376,10 +385,10 @@ f_simple(T, U) :-
 	filter_list_list(t(_,n(0)), Ts, Us),
 	terms_addition(Us, U).
 f_simple(T, U) :-
-	matches_replaces_addition_result([t(plus,n(A)), t(plus,n(B))], [t(plus,n(N)), t(plus,n(0))], T, U),
+	matches_replaces_addition_result([t(+,n(A)), t(+,n(B))], [t(+,n(N)), t(+,n(0))], T, U),
 	N is A + B.
 f_simple(T, U) :-
-	matches_replaces_addition_result([t(plus,n(A)), t(minus,n(B))], [t(plus,n(N)), t(minus,n(0))], T, U),
+	matches_replaces_addition_result([t(+,n(A)), t(-,n(B))], [t(+,n(N)), t(-,n(0))], T, U),
 	N is A - B.
 f_simple(T, U) :-
 	dif(A, n(0)),
@@ -392,42 +401,29 @@ f_simple(T, U) :-
 	dif(A, n(0)),
 	matches_replaces_addition_result([t(Op,A*n(N)), t(Op,A)], [t(Op,n(M)*A), t(Op,n(0))], T, U),
 	M is N + 1.
-% Multiplication
+% Multiplication & Division
 f_simple(T, n(0)) :-
 	mul_terms(T, Ts),
-	member(n(0), Ts).
+	member(t(*, n(0)), Ts).
 f_simple(T, U) :-
 	mul_terms(T, Ts),
-	member(n(1), Ts),
-	filter_list_list(n(1), Ts, Us),
+	member(t(_,n(1)), Ts),
+	filter_list_list(t(_,n(1)), Ts, Us),
 	terms_mul(Us, U).
 f_simple(T, U) :-
-	matches_replaces_mul_result([n(A), n(B)], [n(N), n(1)], T, U),
+	matches_replaces_mul_result([t(*,n(A)), t(*,n(B))], [t(*,n(N)), t(*,n(1))], T, U),
 	N is A * B.
+%f_simple(T, U) :-
+%	matches_replaces_mul_result([t(*,n(A)), t(/,n(B))], [t(*,n(N)), t(/,n(1))], T, U),
+%	N is A rdiv B.
 f_simple(T, U) :-
 	dif(A, n(1)),
 	dif(A, n(0)),
-	matches_replaces_mul_result([A, A], [A^n(2), n(1)], T, U).
+	matches_replaces_mul_result([t(*,A), t(*,A)], [t(*,A^n(2)), t(*,n(1))], T, U).
 f_simple(T, U) :-
 	dif(A, n(1)),
 	dif(A, n(0)),
-	matches_replaces_mul_result([A, n(1)/A], [n(1), n(1)], T, U).
-% Division
-f_simple(T, U) :-
-	matches_replaces_mul_result([n(A)/n(B)], [n(N)], T, U),
-	N is A rdiv B.
-f_simple(T, U) :-
-	matches_replaces_mul_result([n(A), n(1)/n(B)], [n(N), n(1)], T, U),
-	N is A rdiv B.
-f_simple(T, U) :-
-	mul_terms(T, Ts),
-	member(n(1)/n(1), Ts),
-	filter_list_list(n(1)/n(1), Ts, Us),
-	terms_mul(Us, U).
-f_simple(A/(B/C), (A*C)/B).
-f_simple((A/B)/C, A/(B*C)).
-f_simple(T, U) :-
-	matches_replaces_mul_result([A/B, C/D], [(A*C)/(B*D), n(1)], T, U).
+	matches_replaces_mul_result([t(*,A), t(/,A)], [t(*,n(1)), t(/,n(1))], T, U).
 % Power
 f_simple(_^n(0), n(1)).
 f_simple(A^n(1), A).
@@ -440,34 +436,31 @@ f_simple(A^n(N), n(1)/(A^n(M))) :-
 	M is (-1) * N.
 f_simple((A^B)^C, A^(B*C)).
 f_simple(T, U) :-
-	matches_replaces_mul_result([A^N, A], [A^(N+n(1)), n(1)], T, U).
+	matches_replaces_mul_result([t(*,A^N), t(*,A)], [t(*,A^(N+n(1))), t(*,n(1))], T, U).
 f_simple(T, U) :-
-	matches_replaces_mul_result([A^B, A^C], [A^(B+C), n(1)], T, U).
+	matches_replaces_mul_result([t(*,A^B), t(*,A^C)], [t(*,A^(B+C)), t(*,n(1))], T, U).
 % Kürzi kürzi
 f_simple(T, U) :-
 	dif(A, n(0)),
 	dif(A, n(1)),
-	matches_replaces_mul_result([A^N, n(1)/Z], [A^(N-M), n(1)/NewZ], T, U),
-	matches_replaces_mul_result([A^M], [n(1)], Z, NewZ).
+	matches_replaces_mul_result([t(*,A^N), t(/,A^M)], [t(*,A^(N-M)), t(/,n(1))], T, U).
 f_simple(T, U) :-
 	dif(A, n(0)),
 	dif(A, n(1)),
-	matches_replaces_mul_result([A, n(1)/Z], [n(1), n(1)/NewZ], T, U),
-	matches_replaces_mul_result([A^N], [A^(N-n(1))], Z, NewZ).
+	matches_replaces_mul_result([t(*,A), t(/,A^N)], [t(*,n(1)), t(/, A^(N-n(1)))], T, U).
 f_simple(T, U) :-
 	dif(A, n(0)),
 	dif(A, n(1)),
-	matches_replaces_mul_result([A^N, n(1)/Z], [A^(N-n(1)), n(1)/NewZ], T, U),
-	matches_replaces_mul_result([A], [n(1)], Z, NewZ).
+	matches_replaces_mul_result([t(*,A^N), t(/,A)], [t(*,A^(N-n(1))), t(/,n(1))], T, U).
 % Extract sign
 f_simple(T, U) :-
-	matches_replaces_addition_result([t(plus, Z)], [t(minus, NewZ)], T, U),
-	matches_replaces_mul_result([n(N)], [n(M)], Z, NewZ),
+	matches_replaces_addition_result([t(+, Z)], [t(-, NewZ)], T, U),
+	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], Z, NewZ),
 	N < 0,
 	M is N * (-1).
 f_simple(T, U) :-
-	matches_replaces_addition_result([t(minus, Z)], [t(plus, NewZ)], T, U),
-	matches_replaces_mul_result([n(N)], [n(M)], Z, NewZ),
+	matches_replaces_addition_result([t(-, Z)], [t(+, NewZ)], T, U),
+	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], Z, NewZ),
 	N < 0,
 	M is N * (-1).
 % ln
@@ -498,7 +491,7 @@ f_simple(T, U) :-
 	addition_terms(T, Ts),
 	length(Ts, TsLen),
 	TsLen > 1,
-	maplist({A}+\t(Op,LT)^t(Op,LU)^matches_replaces_mul_result([A], [n(1)], LT, LU), Ts, Ds),
+	maplist({A}+\t(Op,LT)^t(Op,LU)^matches_replaces_mul_result([t(*,A)], [t(*,n(1))], LT, LU), Ts, Ds),
 	terms_addition(Ds, D),
 	U = A*D.
 % Sort the terms
@@ -506,7 +499,7 @@ f_simple(T, U) :-
 	Ts = [_,_|_],
 	addition_terms(T, Ts),
 	dif(Ts, Us),
-	predsort(\R^t(_,A)^t(_,B)^rel_plus_termorder(R,A,B), Ts, Us),
+	predsort(rel_plus_termorder, Ts, Us),
 	terms_addition(Us, U).
 f_simple(T, U) :-
 	Ts = [_,_|_],
@@ -515,18 +508,19 @@ f_simple(T, U) :-
 	predsort(rel_mul_termorder, Ts, Us),
 	terms_mul(Us, U).
 % Fallback (recursion)
-f_simple(A+B, AS+BS) :- f_simple(A, AS), f_simple(B, BS).
-f_simple(A-B, AS-BS) :- f_simple(A, AS), f_simple(B, BS).
-f_simple(A*B, AS*BS) :- f_simple(A, AS), f_simple(B, BS).
-f_simple(A/B, AS/BS) :- f_simple(A, AS), f_simple(B, BS).
-f_simple(A^B, AS^BS) :- f_simple(A, AS), f_simple(B, BS).
-f_simple(ln(A), ln(AS)) :- f_simple(A, AS).
-f_simple(cos(A), cos(AS)) :- f_simple(A, AS).
-f_simple(sin(A), sin(AS)) :- f_simple(A, AS).
-f_simple(tan(A), tan(AS)) :- f_simple(A, AS).
-f_simple(cot(A), cot(AS)) :- f_simple(A, AS).
-f_simple(C, C) :- constant(C).
-f_simple(V, V) :- variable(V).
+f_simple(T, U) :-
+	binop_type_arg_arg(T, Op, A, B),
+	f_simple(A, AS),
+	f_simple(B, BS),
+	binop_type_arg_arg(U, Op, AS, BS).
+f_simple(T, U) :-
+	fn_type_arg(T, Fn, A),
+	f_simple(A, AS),
+	fn_type_arg(U, Fn, AS).
+f_simple(C, C) :-
+	constant(C).
+f_simple(V, V) :-
+	variable(V).
 
 f_maxsimple_(F, [F]) :-
 	dif(F, S),
@@ -560,8 +554,9 @@ f_maxsimple(F, S) :-
 :- f_maxsimple(x*n(4)*x, n(4)*x^n(2)).
 
 :- f_maxsimple(n(1) + x^n(3) + x^n(5)*n(4), n(4)*x^n(5) + x^n(3) + n(1)).
-:- f_maxsimple(n(4)*x^n(4)/n(3) + (x^x)/n(4), n(1 rdiv 4)*x^x + n(4 rdiv 3)*x^n(4)).
-:- f_maxsimple(n(4)*x^n(4)/n(-3) + (x^x)/n(-4), n(-1 rdiv 4)*x^x - n(4 rdiv 3)*x^n(4)).
+:- f_maxsimple(n(4)*x^n(4)/n(3) + (x^x)/n(4), x^x/n(4) + n(4)*x^n(4)/n(3)).
+:- f_maxsimple(n(4)*x^n(4)/n(-3) + (x^x)/n(-4), n(-1)*x^x/n(4) - n(4)*x^n(4)/n(3)).
+:- f_maxsimple(n(2)/n(4), n(1)/n(2)).
 
 :- f_maxsimple(x^n(-1), n(1)/x).
 :- f_maxsimple((x*x) + n(4) + (x*x), n(2)*x^n(2) + n(4)).
@@ -591,9 +586,11 @@ f_maxsimple(F, S) :-
 :- f_maxsimple(x^n(2) - x*n(1)*n(-1), x^n(2) + x).
 
 :- f_maxsimple(x-x^n(2), n(-1)*x^n(2) + x).
+:- f_maxsimple(n(1)/cos(x)-n(1)/cos(x), n(0)).
+:- f_maxsimple(n(1)/cos(x)/sin(x) - n(1)/cos(x), (n(1)/sin(x) - n(1))/cos(x)).
 
-:- f_ddx(ln(ln(n(1)/x)), D), f_maxsimple(D, n(-1)/(x*ln(n(1)/x))).
-:- f_ddx(sin(cos(n(1)/x)), D), f_maxsimple(D, n(1)/x^n(2)*sin(n(1)/x)*cos(cos(n(1)/x))).
+:- f_ddx(ln(ln(n(1)/x)), D), f_maxsimple(D, n(-1)/x/ln(n(1)/x)).
+:- f_ddx(sin(cos(n(1)/x)), D), f_maxsimple(D, sin(n(1)/x)*cos(cos(n(1)/x))/x^n(2)).
 :- f_ddx(cos(x)/cos(x), D), f_maxsimple(D, n(0)).
 :- f_ddx(x*e^(pi*x), D), f_maxsimple(D, e^ (pi*x)* (pi*x+n(1))).
 :- f_ddx(sin(x^n(2))^n(2), D), f_maxsimple(D, n(4)*x*sin(x^n(2))*cos(x^n(2))).
