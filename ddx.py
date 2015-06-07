@@ -86,3 +86,6 @@ def make_integral(term, output_path):
     with open(output_path, "wb") as fp:
         fp.write(png_data)
 
+def generate(count, whatstr, what):
+    for i in range(count):
+        make_integral(what(), whatstr + str(i) + ".png")
