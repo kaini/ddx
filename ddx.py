@@ -61,29 +61,28 @@ def medium():
     elif type == 2:
         return "(" + choice(["tan", "cot"]) + "(" + simple() + "))"
 
-# TODO difficulty
-start = medium()
+def make_integral(term, output_path):
+    with open("input.txt", "w") as fp:
+        fp.write("""
+            [ddx].
+            main_print(""" + term + """), !.
+            halt.
+        """)
 
-with open("input.txt", "w") as fp:
-    fp.write("""
-        [ddx].
-        main_print(""" + start + """), !.
-        halt.
-    """)
+    with open("input.txt", "r") as infp:
+        with open("output.txt", "w") as outfp:
+            subprocess.call(["swipl", "--quiet", "ddx.pl"],
+                            stdin=infp, stdout=outfp, stderr=outfp)
 
-with open("input.txt", "r") as infp:
-    with open("output.txt", "w") as outfp:
-        subprocess.call(["swipl", "--quiet", "ddx.pl"],
-                        stdin=infp, stdout=outfp, stderr=outfp)
+    with open("output.txt", "r") as fp:
+        output = fp.read()
+    latex = [l for l in output.split("\n") if l.startswith("\\int")][0]
 
-with open("output.txt", "r") as fp:
-    output = fp.read()
-latex = [l for l in output.split("\n") if l.startswith("\\int")][0]
+    get_arg = urllib.parse.quote("\\dpi{150} \\bg_white " + latex, safe="")
+    url = "http://latex.codecogs.com/png.latex?" + get_arg
+    with urllib.request.urlopen(url) as http:
+        png_data = http.read()
 
-get_arg = urllib.parse.quote("\\dpi{150} \\bg_white " + latex, safe="")
-url = "http://latex.codecogs.com/png.latex?" + get_arg
-with urllib.request.urlopen(url) as http:
-    png_data = http.read()
+    with open(output_path, "wb") as fp:
+        fp.write(png_data)
 
-with open("output.png", "wb") as fp:
-    fp.write(png_data)

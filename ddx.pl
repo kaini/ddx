@@ -70,64 +70,64 @@ or(false, true, true).
 or(false, false, false).
 
 term_latex_root(T) -->
-	"\\int ", term_latex(T, false, true, false), " \\operatorname{d}\\!x".
+	"\\int ", term_latex(T, false, true, true, false), " \\operatorname{d}\\!x".
 
-% arguments: (term, multiplication brace, addition brace, after brace)
-term_latex(V, _, _, _) -->
+% arguments: (term, multiplication brace, addition brace, after brace, can ommit (-1) to -)
+term_latex(V, _, _, _, _) -->
 	{ variable(V) },
 	variable_latex(V).
-term_latex(C, _, _, AfterBr) -->
+term_latex(C, _, _, AfterBr, OmitMinus1) -->
 	{ constant(C) },
-	constant_latex(C, AfterBr).
-term_latex(A+B, _, AddBr, AfterBr) -->
+	constant_latex(C, AfterBr, OmitMinus1).
+term_latex(A+B, _, AddBr, AfterBr, _) -->
 	obrace(AddBr),
 	{ or(AddBr, AfterBr, NeedBr) },
-	term_latex(A, false, false, NeedBr),
+	term_latex(A, false, false, NeedBr, false),
 	" + ",
-	term_latex(B, false, false, false),
+	term_latex(B, false, false, false, false),
 	cbrace(AddBr).
-term_latex(A-B, _, AddBr, AfterBr) -->
+term_latex(A-B, _, AddBr, AfterBr, _) -->
 	obrace(AddBr),
 	{ or(AddBr, AfterBr, NeedBr) },
-	term_latex(A, false, false, NeedBr),
+	term_latex(A, false, false, NeedBr, false),
 	" - ",
-	term_latex(B, false, true, false),
+	term_latex(B, false, true, false, false),
 	cbrace(AddBr).
-term_latex(A*B, MulBr, _, AfterBr) -->
+term_latex(A*B, MulBr, _, AfterBr, _) -->
 	obrace(MulBr),
 	{ or(MulBr, AfterBr, NeedBr) },
-	term_latex(A, false, true, NeedBr),
+	term_latex(A, false, true, NeedBr, true),
 	" ",
-	term_latex(B, false, true, false),
+	term_latex(B, false, true, false, false),
 	cbrace(MulBr).
-term_latex(A/B, _, _, _) -->
+term_latex(A/B, _, _, _, _) -->
 	"\\frac{",
-	term_latex(A, false, false, true),
+	term_latex(A, false, false, true, false),
 	"}{",
-	term_latex(B, false, false, true),
+	term_latex(B, false, false, true, false),
 	"}".
-term_latex(A^B, MulBr, _, _) -->
+term_latex(A^B, MulBr, _, _, _) -->
 	{ dif(B, 1/2) },
 	obrace(MulBr),
-	term_latex(A, true, true, false),
+	term_latex(A, true, true, false, false),
 	"^{",
-	term_latex(B, false, false, true),
+	term_latex(B, false, false, true, false),
 	"}",
 	cbrace(MulBr).
-term_latex(A^(1/2), _, _, _) -->
+term_latex(A^(1/2), _, _, _, _) -->
 	"\\sqrt{",
-	term_latex(A, false, false, true),
+	term_latex(A, false, false, true, false),
 	"}".
-term_latex(sin(T), _, _, _) -->
-	"\\sin(", term_latex(T, false, false, true), ")".
-term_latex(cos(T), _, _, _) -->
-	"\\cos(", term_latex(T, false, false, true), ")".
-term_latex(tan(T), _, _, _) -->
-	"\\tan(", term_latex(T, false, false, true), ")".
-term_latex(cot(T), _, _, _) -->
-	"\\cot(", term_latex(T, false, false, true), ")".
-term_latex(ln(T), _, _, _) -->
-	"\\ln(", term_latex(T, false, false, true), ")".
+term_latex(sin(T), _, _, _, _) -->
+	"\\sin(", term_latex(T, false, false, true, false), ")".
+term_latex(cos(T), _, _, _, _) -->
+	"\\cos(", term_latex(T, false, false, true, false), ")".
+term_latex(tan(T), _, _, _, _) -->
+	"\\tan(", term_latex(T, false, false, true, false), ")".
+term_latex(cot(T), _, _, _, _) -->
+	"\\cot(", term_latex(T, false, false, true, false), ")".
+term_latex(ln(T), _, _, _, _) -->
+	"\\ln(", term_latex(T, false, false, true, false), ")".
 
 obrace(false) -->
 	"".
@@ -139,25 +139,30 @@ cbrace(false) -->
 cbrace(true) -->
 	"\\right]".
 
-constant_latex(e, _) -->
+constant_latex(e, _, _) -->
 	"e".
-constant_latex(pi, _) -->
+constant_latex(pi, _, _) -->
 	"\\pi".
-constant_latex(n(N), _) -->
+constant_latex(n(N), _, _) -->
 	{ integer(N) },
 	{ N >= 0 },
 	{ format(string(Tex), '~d', [N]) },
 	Tex.
-constant_latex(n(N), false) -->
+constant_latex(n(N), false, _) -->
 	{ integer(N) },
 	{ N < 0 },
 	{ format(string(Tex), '(~d)', [N]) },
 	Tex.
-constant_latex(n(N), true) -->
+constant_latex(n(N), true, _) -->
 	{ integer(N) },
 	{ N < 0 },
+	{ dif(N, -1) },
 	{ format(string(Tex), '~d', [N]) },
 	Tex.
+constant_latex(n(-1), true, true) -->
+	"-".
+constant_latex(n(-1), true, false) -->
+	"-1".
 
 variable_latex(x) -->
 	"x".
