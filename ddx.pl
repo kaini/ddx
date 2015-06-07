@@ -498,19 +498,25 @@ f_simple(ln(A^B), B*ln(A)).
 f_simple(ln(e), n(1)).
 % sin
 f_simple(sin(n(0)), n(0)).
-f_simple(sin(pi/n(2)), n(1)).
-f_simple(sin(n(1)/n(2)*pi), n(1)).
 f_simple(sin(pi), n(0)).
-f_simple(sin(n(3)/n(2)*pi), n(-1)).
+f_simple(sin(T), n(-1)*sin(U)) :-
+	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], T, U),
+	N < 0,
+	M is N * (-1).
 % cos
 f_simple(cos(n(0)), n(1)).
-f_simple(cos(pi/n(2)), n(0)).
-f_simple(cos(n(1)/n(2)*pi), n(0)).
 f_simple(cos(pi), n(-1)).
-f_simple(cos(n(3)/n(2)*pi), n(0)).
+f_simple(cos(T), cos(U)) :-
+	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], T, U),
+	N < 0,
+	M is N * (-1).
 % tan
 f_simple(tan(n(0)), n(0)).
 f_simple(tan(pi), n(0)).
+f_simple(tan(T), n(-1)*tan(U)) :-
+	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], T, U),
+	N < 0,
+	M is N * (-1).
 f_simple(T, U) :-
 	t_optpow(Sin, sin(A), P),
 	t_optpow(Cos, cos(A), P),
@@ -519,8 +525,10 @@ f_simple(T, U) :-
 	t_optpow(Tan, tan(A), P),
 	matches_replaces_mul_result([t(/, Tan)], [t(*,cot(A)^P)], T, U).
 % cot
-f_simple(cot(pi/n(2)), n(0)).
-f_simple(cot(n(1)/n(2)*pi), n(0)).
+f_simple(cot(T), n(-1)*cot(U)) :-
+	matches_replaces_mul_result([t(Op,n(N))], [t(Op,n(M))], T, U),
+	N < 0,
+	M is N * (-1).
 f_simple(T, U) :-
 	t_optpow(Sin, sin(A), P),
 	t_optpow(Cos, cos(A), P),
@@ -648,6 +656,8 @@ f_maxsimple(F, S) :-
 
 :- f_maxsimple(n(5)/tan(x^n(4))^n(2), n(5)*cot(x^n(4))^n(2)).
 :- f_maxsimple(n(5)/cot(x^n(4))^n(2), n(5)*tan(x^n(4))^n(2)).
+:- f_maxsimple(cos(x*n(-3)), cos(n(3)*x)).
+:- f_maxsimple(sin(x*n(-3)), n(-1)*sin(n(3)*x)).
 
 :- f_ddx(tan(x), D), f_maxsimple(D, tan(x)^n(2)+n(1)).
 :- f_ddx(cot(x), D), f_maxsimple(D, n(-1)*(cot(x)^n(2)+n(1))).

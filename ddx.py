@@ -6,7 +6,7 @@ import urllib.request
 import urllib.parse
 from random import randint, choice
 
-def num(allow0=False):
+def inum(allow0=False):
     n = randint(-10, 10)
     if n == -10:
         return "(e)"
@@ -15,7 +15,10 @@ def num(allow0=False):
     elif not allow0 and n == 0:
         return num(False)
     else:
-        return "(" + str(n) + ")"
+        return "n(" + str(n) + ")"
+
+def num(allow0=False):
+    return inum(allow0)
 
 def simpleterm():
     type = randint(0, 1)
@@ -37,6 +40,7 @@ def simpleterm_offset():
     
 def simple():
     type = randint(0, 2)
+    print("simple", type)
     if type == 0:
         return "(" + simpleterm() + choice(["+", "-"]) + simpleterm() + ")"
     elif type == 1:
@@ -49,15 +53,16 @@ def simple():
 
 def medium():
     type = randint(0, 2)
+    print("medium", type)
     if type == 0:
         return "(" + simple() + choice(["*"]) + simple() + ")"
     elif type == 1:
         return "(" + simple() + "^" + num() + ")"
-    else:
-        return None
+    elif type == 2:
+        return "(" + choice(["tan", "cot"]) + "(" + simple() + "))"
 
 # TODO difficulty
-start = "(ln(x^2+x)*sin(x^3-x^2)*e^x)^x"
+start = medium()
 
 with open("input.txt", "w") as fp:
     fp.write("""
@@ -75,7 +80,7 @@ with open("output.txt", "r") as fp:
     output = fp.read()
 latex = [l for l in output.split("\n") if l.startswith("\\int")][0]
 
-get_arg = urllib.parse.quote("\\dpi{200} \\bg_white " + latex, safe="")
+get_arg = urllib.parse.quote("\\dpi{150} \\bg_white " + latex, safe="")
 url = "http://latex.codecogs.com/png.latex?" + get_arg
 with urllib.request.urlopen(url) as http:
     png_data = http.read()
