@@ -77,13 +77,19 @@ def medium():
     elif type == 3:
         return "(" + simple() + "*x)"
 
-"""
-# HARD
+def hard():
+    type = randint(0, 4)
+    print("hard", type)
     if type == 0:
         return "(" + simple() + choice(["*"]) + simple() + ")"
+    elif type == 1:
+        return "(" + simple() + "/x)"
     elif type == 2:
         return "(" + choice(["tan", "cot"]) + "(" + simple() + "))"
-"""
+    elif type == 3:
+        return "(" + simple() + "*x^(" + num() + "))"
+    elif type == 4:
+        return "(" + simple() + "^x)"
 
 def make_integral(term, output_path):
     with open("input.txt", "w") as fp:
