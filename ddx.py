@@ -4,7 +4,10 @@ import sys
 import io
 import urllib.request
 import urllib.parse
-from random import randint, choice
+from random import randint, choice, seed
+
+NICE_FNS = ["ln", "cos", "sin", "e^"]
+MOST_FNS = NICE_FNS + ["atan", "asin", "acos"]
 
 def inum(allow0=False):
     n = randint(-10, 10)
@@ -24,7 +27,7 @@ def simpleterm():
     type = randint(0, 1)
     if type == 0:
         # a*fn(b*x)
-        return "(" + num() + "*" + choice(["ln", "cos", "sin", "e^"]) + "(" + num() + "*x))"
+        return "(" + num() + "*" + choice(NICE_FNS) + "(" + num() + "*x))"
     elif type == 1:
         # a*x^b
         return "(" + num() + "*x^" + num() + ")"
@@ -33,7 +36,7 @@ def simpleterm_offset():
     type = randint(0, 1)
     if type == 0:
         # a*fn(b*x+c)
-        return "(" + num() + "*" + choice(["ln", "cos", "sin", "e^"]) + "(" + num() + "*x+" + num(True) + "))"
+        return "(" + num() + "*" + choice(NICE_FNS) + "(" + num() + "*x+" + num(True) + "))"
     elif type == 1:
         # a*(x+c)^b
         return "(" + num() + "*(x+" + num(True) + ")^" + num() + ")"
@@ -47,19 +50,40 @@ def simple():
         return simpleterm_offset()
     elif type == 2:
         # a*fn(b*fn(c*x))
-        return "(" + num() + "*" + choice(["ln", "cos", "sin", "e^"]) + "(" + \
-            num() + "*" + choice(["ln", "cos", "sin", "e^"]) + "(" + \
+        return "(" + num() + "*" + choice(NICE_FNS) + "(" + \
+            num() + "*" + choice(NICE_FNS) + "(" + \
             num() + "*" + "x)))"
 
 def medium():
-    type = randint(0, 2)
+    type = randint(0,3)
     print("medium", type)
     if type == 0:
-        return "(" + simple() + choice(["*"]) + simple() + ")"
+        return "".join([
+            "(", choice(MOST_FNS), "(", simple(), "))",
+        ])
     elif type == 1:
-        return "(" + simple() + "^" + num() + ")"
+        n = num(True)
+        if n == 0:
+            n = "(1/2)"
+        return "(" + simple() + "^" + n + ")"
+    elif type == 2:
+        def power():
+            return "(" + num() + "*x^" + "n(1)" + ")"
+        return "".join(["(",
+            choice(NICE_FNS), "(", power(), ")",
+            choice(["*"]),
+            choice(NICE_FNS), "(", power(), ")",
+        ")"])
+    elif type == 3:
+        return "(" + simple() + "*x)"
+
+"""
+# HARD
+    if type == 0:
+        return "(" + simple() + choice(["*"]) + simple() + ")"
     elif type == 2:
         return "(" + choice(["tan", "cot"]) + "(" + simple() + "))"
+"""
 
 def make_integral(term, output_path):
     with open("input.txt", "w") as fp:
@@ -89,3 +113,7 @@ def make_integral(term, output_path):
 def generate(count, whatstr, what):
     for i in range(count):
         make_integral(what(), whatstr + str(i) + ".png")
+
+if __name__ == '__main__':
+    seed()
+    generate(10, "medium", medium)

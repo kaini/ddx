@@ -55,6 +55,9 @@ fn_type_arg(sin(A), sin, A).
 fn_type_arg(cos(A), cos, A).
 fn_type_arg(tan(A), tan, A).
 fn_type_arg(cot(A), cot, A).
+fn_type_arg(atan(A), atan, A).
+fn_type_arg(asin(A), asin, A).
+fn_type_arg(acos(A), acos, A).
 
 term(V) :- variable(V).
 term(C) :- constant(C).
@@ -107,14 +110,14 @@ term_latex(A/B, _, _, _, _) -->
 	term_latex(B, false, false, true, false),
 	"}".
 term_latex(A^B, MulBr, _, _, _) -->
-	{ dif(B, 1/2) },
+	{ dif(B, n(1)/n(2)) },
 	obrace(MulBr),
 	term_latex(A, true, true, false, false),
 	"^{",
 	term_latex(B, false, false, true, false),
 	"}",
 	cbrace(MulBr).
-term_latex(A^(1/2), _, _, _, _) -->
+term_latex(A^(n(1)/n(2)), _, _, _, _) -->
 	"\\sqrt{",
 	term_latex(A, false, false, true, false),
 	"}".
@@ -128,6 +131,12 @@ term_latex(cot(T), _, _, _, _) -->
 	"\\cot(", term_latex(T, false, false, true, false), ")".
 term_latex(ln(T), _, _, _, _) -->
 	"\\ln(", term_latex(T, false, false, true, false), ")".
+term_latex(atan(T), _, _, _, _) -->
+	"\\arctan(", term_latex(T, false, false, true, false), ")".
+term_latex(acos(T), _, _, _, _) -->
+	"\\arccos(", term_latex(T, false, false, true, false), ")".
+term_latex(asin(T), _, _, _, _) -->
+	"\\arcsin(", term_latex(T, false, false, true, false), ")".
 
 obrace(false) -->
 	"".
@@ -190,6 +199,13 @@ f_ddx(ln(A), A^n(-1) * AA) :-
 f_ddx(sin(A), cos(A) * AA) :-
 	f_ddx(A, AA).
 f_ddx(cos(A), n(-1) * sin(A) * AA) :-
+	f_ddx(A, AA).
+% Inverse functions
+f_ddx(atan(A), AA / (n(1) + A^n(2))) :-
+	f_ddx(A, AA).
+f_ddx(asin(A), AA / (n(1) - A^n(2))^(n(1)/n(2))) :-
+	f_ddx(A, AA).
+f_ddx(acos(A), n(-1) * AA / (n(1) - A^n(2))^(n(1)/n(2))) :-
 	f_ddx(A, AA).
 % Extra rules: These terms will be differentiated by changing them to ones that
 % can be differentiated.
@@ -261,7 +277,7 @@ matches_replaces_list_list(Ms, Rs, Xs, Ys) :-
 :- matches_replaces_list_list([1,2], [2,1], [1,3,2], [2,3,1]).
 
 % Addidive order
-additionorder([PM, ln(_), sin(_), cos(_), tan(_), cot(_), MDP, V, C]) :-
+additionorder([PM, ln(_), sin(_), cos(_), tan(_), cot(_), asin(_), acos(_), atan(_), MDP, V, C]) :-
 	plusminus(PM),
 	muldivpow(MDP),
 	variable(V),
@@ -295,7 +311,7 @@ rel_plus_termorder(>, t(_, A), t(_, B)) :- plus_termorder(A, B), !.
 rel_plus_termorder(<, _, _) :- !.
 
 % Multiplicative order
-mulorder([C, V, MDP, ln(_), sin(_), cos(_), tan(_), cot(_), PM]) :-
+mulorder([C, V, MDP, ln(_), sin(_), cos(_), tan(_), cot(_), asin(_), acos(_), atan(_), PM]) :-
 	constant(C),
 	variable(V),
 	muldivpow(MDP),
@@ -541,6 +557,12 @@ f_simple(T, U) :-
 f_simple(T, U) :-
 	t_optpow(Cot, cot(A), P),
 	matches_replaces_mul_result([t(/, Cot)], [t(*,tan(A)^P)], T, U).
+% atan
+f_simple(tan(atan(T)), T).
+% acos
+f_simple(sin(asin(T)), T).
+% asin
+f_simple(cos(acos(T)), T).
 % Factor common terms (distributive law)
 f_simple(T, U) :-
 	dif(A, n(0)),
@@ -596,7 +618,7 @@ f_maxsimple_(F, [S|Ss]) :-
 	dif(F, S),
 	f_simple(F, S),
 	!,
-	%print(S), nl,
+	print(S), nl,
 	term(S),  % security check
 	f_maxsimple_(S, Ss).
 
